@@ -72,6 +72,17 @@
       line-height: 1.5;
     }
 
+    .doc-count {
+      display: inline-flex;
+      margin-top: 12px;
+      padding: 6px 10px;
+      color: var(--accent);
+      background: #eef4ff;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
     .legend {
       display: flex;
       flex-wrap: wrap;
@@ -327,6 +338,64 @@
       line-height: 1.7;
     }
 
+    .reader {
+      min-height: 420px;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .reader-frame {
+      display: block;
+      width: 100%;
+      min-height: 68vh;
+      border: 0;
+      background: #f8fafc;
+    }
+
+    .reader-html {
+      max-height: 68vh;
+      padding: 22px;
+      overflow: auto;
+      line-height: 1.75;
+    }
+
+    .reader-html p {
+      margin: 0 0 12px;
+    }
+
+    .reader-html h3 {
+      margin: 20px 0 10px;
+      color: var(--accent);
+      font-size: 18px;
+    }
+
+    .reader-html table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .reader-html td,
+    .reader-html th {
+      min-width: 110px;
+      padding: 8px 10px;
+      border: 1px solid #d7e0ec;
+      vertical-align: top;
+    }
+
+    .reader-html tr:nth-child(odd) {
+      background: #f8fafc;
+    }
+
+    .table-wrap {
+      max-width: 100%;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
     .add-doc {
       display: grid;
       gap: 10px;
@@ -435,6 +504,12 @@
         grid-template-columns: 1fr;
       }
 
+      .reader-frame,
+      .reader-html {
+        max-height: none;
+        min-height: calc(100vh - 270px);
+      }
+
       .open-link {
         justify-content: center;
       }
@@ -456,6 +531,7 @@
       <div class="sidebar-header">
         <h1>Tài liệu kỳ họp thứ 3</h1>
         <p>Chọn một tài liệu ở menu bên trái để xem nhanh thông tin ở khung bên phải.</p>
+        <span class="doc-count" id="docCount">0 tài liệu</span>
       </div>
 
       <div class="legend" aria-label="Chú giải loại file">
@@ -509,17 +585,12 @@
           </div>
         </div>
 
-        <div class="preview">
-          <div>
-            <div class="preview-icon" id="previewIcon">PDF</div>
-            <h2 id="previewTitle"></h2>
-            <p id="previewText"></p>
-          </div>
-        </div>
+        <div class="reader" id="reader"></div>
       </div>
     </section>
   </main>
 
+  <script src="content-data.js"></script>
   <script>
     const basePath = "file:///C:/Users/Admin/Downloads/T%C3%A0i%20li%E1%BB%87u%20k%E1%BB%B3%20h%E1%BB%8Dp%20th%E1%BB%A9%203%20g%E1%BB%ADi%20%C4%91%E1%BA%A1i%20bi%E1%BB%83u%20H%C4%90ND/T%C3%A0i%20li%E1%BB%87u%20k%E1%BB%B3%20h%E1%BB%8Dp%20th%E1%BB%A9%203%20g%E1%BB%ADi%20%C4%91%E1%BA%A1i%20bi%E1%BB%83u%20H%C4%90ND/";
 
@@ -562,18 +633,25 @@
     const newDocType = document.getElementById("newDocType");
     const backButton = document.getElementById("backButton");
     const mobileTitle = document.getElementById("mobileTitle");
+    const docCount = document.getElementById("docCount");
     const viewerBody = document.getElementById("viewerBody");
     const viewerType = document.getElementById("viewerType");
     const viewerTitle = document.getElementById("viewerTitle");
     const viewerNumber = document.getElementById("viewerNumber");
     const viewerFormat = document.getElementById("viewerFormat");
     const openLink = document.getElementById("openLink");
-    const previewIcon = document.getElementById("previewIcon");
-    const previewTitle = document.getElementById("previewTitle");
-    const previewText = document.getElementById("previewText");
+    const reader = document.getElementById("reader");
 
     function getFileUrl(fileName) {
       return basePath + encodeURIComponent(fileName).replace(/%2F/g, "/");
+    }
+
+    function getReaderPdfUrl(doc) {
+      return `files/doc-${doc.number}.pdf`;
+    }
+
+    function hasLocalReaderPdf(doc) {
+      return doc.type === "pdf" && !String(doc.number).startsWith("Mới");
     }
 
     function escapeHtml(value) {
@@ -611,6 +689,7 @@
     }
 
     function renderList() {
+      docCount.textContent = `${documents.length} tài liệu`;
       fileList.innerHTML = documents.map((doc, index) => {
         const info = typeInfo[doc.type];
         return `
@@ -642,12 +721,33 @@
         viewerNumber.textContent = `Mục ${doc.number}`;
         viewerFormat.textContent = info.label;
         openLink.href = getFileUrl(doc.file);
-        previewIcon.textContent = info.label;
-        previewIcon.className = `preview-icon ${info.className}`;
-        previewTitle.textContent = doc.file;
-        previewText.textContent = info.note;
+        renderReader(doc, info);
         viewerBody.classList.remove("switching");
       }, 120);
+    }
+
+    function renderReader(doc, info) {
+      const embeddedContent = window.DOCUMENT_CONTENT && window.DOCUMENT_CONTENT[doc.number];
+
+      if (embeddedContent && embeddedContent.html) {
+        reader.innerHTML = `<div class="reader-html">${embeddedContent.html}</div>`;
+        return;
+      }
+
+      if (hasLocalReaderPdf(doc)) {
+        reader.innerHTML = `<iframe class="reader-frame" src="${getReaderPdfUrl(doc)}" title="${escapeHtml(doc.title)}"></iframe>`;
+        return;
+      }
+
+      reader.innerHTML = `
+        <div class="preview">
+          <div>
+            <div class="preview-icon ${info.className}">${info.label}</div>
+            <h2>${escapeHtml(doc.file)}</h2>
+            <p>${info.note}</p>
+          </div>
+        </div>
+      `;
     }
 
     fileList.addEventListener("click", (event) => {
